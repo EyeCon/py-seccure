@@ -153,7 +153,7 @@ On Mac with MacPorts
 
 ::
 
-    $ port install gmp
+    $ port install py27-gmpy2
     $ pip install seccure
 
 Please contribute!

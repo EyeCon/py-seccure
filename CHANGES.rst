@@ -1,10 +1,10 @@
 py-seccure Changelog
 ====================
 
-0.3.3 (unreleased)
+0.4.0 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Use gmpy2 instead of gmpy
 
 
 0.3.2 (2016-08-07)

@@ -30,7 +30,7 @@ import Crypto.Cipher.AES
 import Crypto.Random.random
 
 # gmpy
-import gmpy
+import gmpy2
 
 l = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def serialize_number(x, fmt=SER_BINARY, outlen=None):
 
 def deserialize_number(s, fmt=SER_BINARY):
     """ Deserializes a number from a string `s' in format `fmt' """
-    ret = gmpy.mpz(0)
+    ret = gmpy2.mpz(0)
     if fmt == SER_BINARY:
         if isinstance(s, six.text_type):
             raise ValueError("Encode `s` to a bytestring yourself to"+
@@ -89,7 +89,7 @@ def deserialize_number(s, fmt=SER_BINARY):
 
 def get_serialized_number_len(x, fmt=SER_BINARY):
     if fmt == SER_BINARY:
-        return (x.numdigits(2) + 7) // 8
+        return (x.num_digits(2) + 7) // 8
     assert fmt == SER_COMPACT
     res = 0
     while x != 0:
@@ -119,7 +119,7 @@ def mod_root(a, p):
         n += 1
     q = p - 1
     r = 0
-    while not q.getbit(r):
+    while not q.bit_test(r):
         r += 1
     q = q >> r
     y = pow(n, q, p)
@@ -133,8 +133,8 @@ def mod_root(a, p):
         while h != 1:
             h = (h * h) % p
             m += 1
-        h = gmpy.mpz(0)
-        h = h.setbit(r - m - 1)
+        h = gmpy2.mpz(0)
+        h = h.bit_set(r - m - 1)
         t = pow(y, h, p)
         y = (t * t) % p
         r = m
@@ -316,7 +316,7 @@ class JacobianPoint(object):
         if self.z == 0:
             return AffinePoint(x=0, y=0, curve=self.curve)
         m = self.curve.m
-        h = gmpy.invert(self.z, m)
+        h = gmpy2.invert(self.z, m)
         y = (h * h) % m
         x = (self.x * y) % m
         y = (y * h) % m
@@ -420,7 +420,7 @@ class AffinePoint(object):
         t1 = (t1 + t2) % m
         t1 = (t1 + a) % m
         t2 = (self.y + self.y) % m
-        t2 = gmpy.invert(t2, m)
+        t2 = gmpy2.invert(t2, m)
         t1 = (t1 * t2) % m
         t2 = (t1 * t1) % m
         t2 = (t2 - self.x) % m
@@ -431,12 +431,12 @@ class AffinePoint(object):
         x = t2
         return AffinePoint(x=x, y=y, curve=self.curve)
     def __mul__(self, exp):
-        n = exp.numdigits(2)
+        n = exp.num_digits(2)
         r = JacobianPoint(x=0, y=0, z=0, curve=self.curve)
         while n:
             r = r.double()
             n -= 1
-            if exp.getbit(n):
+            if exp.bit_test(n):
                 r = r + self
         R = r.to_affine()
         assert R.on_curve
@@ -455,7 +455,7 @@ class AffinePoint(object):
         m = self.curve.m
         t = (self.y - other.y) % m
         y = (self.x - other.x) % m
-        y = gmpy.invert(y, m)
+        y = gmpy2.invert(y, m)
         y = (t * y) % m
         t = (y * y) % m
         x = (self.x + other.x) % m
@@ -489,7 +489,7 @@ class AffinePoint(object):
     def to_string(self, fmt=SER_BINARY):
         return self.to_bytes(fmt).decode()
     def _point_compress(self):
-        return self.y.getbit(0) == 1
+        return self.y.bit_test(0)
     def _ECIES_KDF(self, R):
         h = hashlib.sha512()
         h.update(serialize_number(self.x, SER_BINARY, self.curve.elem_len_bin))
@@ -498,7 +498,7 @@ class AffinePoint(object):
         return h.digest()
     def _ECIES_encryption(self):
         while True:
-            k = gmpy.mpz(Crypto.Random.random.randrange(0,
+            k = gmpy2.mpz(Crypto.Random.random.randrange(0,
                             int(self.curve.order - 1)))
             R = self.curve.base * k
             k = k * self.curve.cofactor
@@ -522,7 +522,7 @@ class AffinePoint(object):
         if s <= 0  or order <= s or r <= 0 or order <= r:
             return False
         e = deserialize_number(md, SER_BINARY) % order
-        s = gmpy.invert(s, order)
+        s = gmpy2.invert(s, order)
         e = (e * s) % order
         X1 = self.curve.base * e
         e = (r * s) % order
@@ -628,7 +628,7 @@ class PrivKey(object):
             e = (e % order)
             s = (self.e * r) % order
             s = (s + e) % order
-            e = gmpy.invert(k, order)
+            e = gmpy2.invert(k, order)
             s = (s * e) % order
         s = s * order
         s = s + r
@@ -743,7 +743,7 @@ class Curve(object):
                                 (self.order * self.order) - 1, SER_BINARY)
         self.sig_len_compact = get_serialized_number_len(
                                 (self.order * self.order) - 1, SER_COMPACT)
-        self.dh_len_bin = min((self.order.numdigits(2) // 2 + 7) // 8, 32)
+        self.dh_len_bin = min((self.order.num_digits(2) // 2 + 7) // 8, 32)
         self.dh_len_compact = get_serialized_number_len(
                                 2 ** self.dh_len_bin - 1, SER_COMPACT)
         self.elem_len_bin = get_serialized_number_len(self.m, SER_BINARY)
@@ -774,7 +774,7 @@ class Curve(object):
         h = (h + self.b) % m
         y = mod_root(h, m)
         if y or not yflag:
-            if bool(y.getbit(0)) == yflag:
+            if y.bit_test(0) == yflag:
                 return AffinePoint(x=x, y=y, curve=self)
             return AffinePoint(x=x, y=m - y, curve=self)
     def hash_to_exponent(self, h):
