@@ -12,11 +12,12 @@ from ._version import __version__  # noqa: F401
 
 # PyCrypto
 import Crypto.Util
+import Crypto.Util.Counter
 import Crypto.Cipher.AES
 import Crypto.Random.random
 
 # gmpy
-import gmpy
+import gmpy2
 
 # six
 import six
@@ -77,7 +78,7 @@ def serialize_number(x, fmt=SER_BINARY, outlen=None):
 
 def deserialize_number(s, fmt=SER_BINARY):
     """ Deserializes a number from a string `s' in format `fmt' """
-    ret = gmpy.mpz(0)
+    ret = gmpy2.mpz(0)
     if fmt == SER_BINARY:
         if isinstance(s, six.text_type):
             raise ValueError(
@@ -98,7 +99,7 @@ def deserialize_number(s, fmt=SER_BINARY):
 
 def get_serialized_number_len(x, fmt=SER_BINARY):
     if fmt == SER_BINARY:
-        return (x.numdigits(2) + 7) // 8
+        return (x.num_digits(2) + 7) // 8
     assert fmt == SER_COMPACT
     res = 0
     while x != 0:
@@ -130,7 +131,7 @@ def mod_root(a, p):
         n += 1
     q = p - 1
     r = 0
-    while not q.getbit(r):
+    while not q.bit_test(r):
         r += 1
     q = q >> r
     y = pow(n, q, p)
@@ -144,7 +145,7 @@ def mod_root(a, p):
         while h != 1:
             h = (h * h) % p
             m += 1
-        h = gmpy.mpz(0)
+        h = gmpy2.mpz(0)
         h = h.setbit(r - m - 1)
         t = pow(y, h, p)
         y = (t * t) % p
@@ -339,12 +340,12 @@ class JacobianPoint(object):
         if self.z == 0:
             return AffinePoint(x=0, y=0, curve=self.curve)
         m = self.curve.m
-        h = gmpy.invert(self.z, m)
-        y = (h * h) % m
-        x = (self.x * y) % m
-        y = (y * h) % m
-        y = (y * self.y) % m
-        return AffinePoint(x=x, y=y, curve=self.curve)
+        h = gmpy2.invert(self.z, m)
+        y2 = (h * h) % m
+        x2 = (self.x * y2) % m
+        y2 = (y2 * h) % m
+        y2 = (y2 * self.y) % m
+        return AffinePoint(x=x2, y=y2, curve=self.curve)
 
     def double(self):
         if not self.z:
@@ -360,21 +361,21 @@ class JacobianPoint(object):
         t1 = (t1 * t1) % m
         t1 = (t1 * a) % m
         t1 = (t1 + t2) % m
-        z = (self.z * self.y) % m
-        z = (z + z) % m
-        y = (self.y * self.y) % m
-        y = (y + y) % m
-        t2 = (self.x * y) % m
+        z2 = (self.z * self.y) % m
+        z2 = (z2 + z2) % m
+        y2 = (self.y * self.y) % m
+        y2 = (y2 + y2) % m
+        t2 = (self.x * y2) % m
         t2 = (t2 + t2) % m
-        x = (t1 * t1) % m
-        x = (x - t2) % m
-        x = (x - t2) % m
-        t2 = (t2 - x) % m
+        x2 = (t1 * t1) % m
+        x2 = (x2 - t2) % m
+        x2 = (x2 - t2) % m
+        t2 = (t2 - x2) % m
         t1 = (t1 * t2) % m
-        t2 = (y * y) % m
+        t2 = (y2 * y2) % m
         t2 = (t2 + t2) % m
-        y = (t1 - t2) % m
-        return JacobianPoint(x=x, y=y, z=z, curve=self.curve)
+        y2 = (t1 - t2) % m
+        return JacobianPoint(x=x2, y=y2, z=z2, curve=self.curve)
 
     def __add__(self, other):
         if not isinstance(other, AffinePoint):
@@ -392,21 +393,21 @@ class JacobianPoint(object):
             if self.y == t1:
                 return self.double()
             return JacobianPoint(x=self.x, y=self.y, z=0, curve=self.curve)
-        x = (self.x - t2) % m
-        y = (self.y - t1) % m
-        z = (self.z * x) % m
-        t3 = (x * x) % m
+        x2 = (self.x - t2) % m
+        y2 = (self.y - t1) % m
+        z2 = (self.z * x2) % m
+        t3 = (x2 * x2) % m
         t2 = (t2 * t3) % m
-        t3 = (t3 * x) % m
+        t3 = (t3 * x2) % m
         t1 = (t1 * t3) % m
-        x = (y * y) % m
-        x = (x - t3) % m
-        x = (x - t2) % m
-        x = (x - t2) % m
-        t2 = (t2 - x) % m
-        y = (y * t2) % m
-        y = (y - t1) % m
-        return JacobianPoint(x=x, y=y, z=z, curve=self.curve)
+        x2 = (y2 * y2) % m
+        x2 = (x2 - t3) % m
+        x2 = (x2 - t2) % m
+        x2 = (x2 - t2) % m
+        t2 = (t2 - x2) % m
+        y2 = (y2 * t2) % m
+        y2 = (y2 - t1) % m
+        return JacobianPoint(x=x2, y=y2, z=z2, curve=self.curve)
 
     def __repr__(self):
         return "<JacobianPoint (%s, %s, %s) of %s>" % (
@@ -449,7 +450,7 @@ class AffinePoint(object):
         t1 = (t1 + t2) % m
         t1 = (t1 + a) % m
         t2 = (self.y + self.y) % m
-        t2 = gmpy.invert(t2, m)
+        t2 = gmpy2.invert(t2, m)
         t1 = (t1 * t2) % m
         t2 = (t1 * t1) % m
         t2 = (t2 - self.x) % m
@@ -461,12 +462,12 @@ class AffinePoint(object):
         return AffinePoint(x=x, y=y, curve=self.curve)
 
     def __mul__(self, exp):
-        n = exp.numdigits(2)
+        n = exp.num_digits(2)
         r = JacobianPoint(x=0, y=0, z=0, curve=self.curve)
         while n:
             r = r.double()
             n -= 1
-            if exp.getbit(n):
+            if exp.bit_test(n):
                 r = r + self
         R = r.to_affine()
         assert R.on_curve
@@ -485,16 +486,16 @@ class AffinePoint(object):
             return AffinePoint(x=0, y=0, curve=self.curve)
         m = self.curve.m
         t = (self.y - other.y) % m
-        y = (self.x - other.x) % m
-        y = gmpy.invert(y, m)
-        y = (t * y) % m
-        t = (y * y) % m
-        x = (self.x + other.x) % m
-        x = (t - x) % m
-        t = (other.x - x) % m
-        y = (y * t) % m
-        y = (y - other.y) % m
-        return AffinePoint(x=x, y=y, curve=self.curve)
+        y2 = (self.x - other.x) % m
+        y2 = gmpy2.invert(y2, m)
+        y2 = (t * y2) % m
+        t = (y2 * y2) % m
+        x2 = (self.x + other.x) % m
+        x2 = (t - x2) % m
+        t = (other.x - x2) % m
+        y2 = (y2 * t) % m
+        y2 = (y2 - other.y) % m
+        return AffinePoint(x=x2, y=y2, curve=self.curve)
 
     def __nonzero__(self):
         return bool(self.x or self.y)
@@ -526,7 +527,7 @@ class AffinePoint(object):
         return self.to_bytes(fmt).decode()
 
     def _point_compress(self):
-        return self.y.getbit(0) == 1
+        return self.y.bit_test(0) == 1
 
     def _ECIES_KDF(self, R):
         h = hashlib.sha512()
@@ -537,7 +538,7 @@ class AffinePoint(object):
 
     def _ECIES_encryption(self):
         while True:
-            k = gmpy.mpz(
+            k = gmpy2.mpz(
                 Crypto.Random.random.randrange(
                     0, int(
                         self.curve.order - 1)))
@@ -565,7 +566,7 @@ class AffinePoint(object):
         if s <= 0 or order <= s or r <= 0 or order <= r:
             return False
         e = deserialize_number(md, SER_BINARY) % order
-        s = gmpy.invert(s, order)
+        s = gmpy2.invert(s, order)
         e = (e * s) % order
         X1 = self.curve.base * e
         e = (r * s) % order
@@ -688,7 +689,7 @@ class PrivKey(object):
             e = (e % order)
             s = (self.e * r) % order
             s = (s + e) % order
-            e = gmpy.invert(k, order)
+            e = gmpy2.invert(k, order)
             s = (s * e) % order
         s = s * order
         s = s + r
@@ -819,7 +820,7 @@ class Curve(object):
             (self.order * self.order) - 1, SER_BINARY)
         self.sig_len_compact = get_serialized_number_len(
             (self.order * self.order) - 1, SER_COMPACT)
-        self.dh_len_bin = min((self.order.numdigits(2) // 2 + 7) // 8, 32)
+        self.dh_len_bin = min((self.order.num_digits(2) // 2 + 7) // 8, 32)
         self.dh_len_compact = get_serialized_number_len(
             2 ** self.dh_len_bin - 1, SER_COMPACT)
         self.elem_len_bin = get_serialized_number_len(self.m, SER_BINARY)
@@ -838,7 +839,7 @@ class Curve(object):
         yflag = x >= self.m
         if yflag:
             x = x - self.m
-        assert 0 < x and x <= self.m
+        assert 0 < x <= self.m
         return self._point_decompress(x, yflag)
 
     def pubkey_from_string(self, s, fmt=SER_BINARY):
@@ -852,7 +853,7 @@ class Curve(object):
         h = (h + self.b) % m
         y = mod_root(h, m)
         if y or not yflag:
-            if bool(y.getbit(0)) == yflag:
+            if bool(y.bit_test(0)) == yflag:
                 return AffinePoint(x=x, y=y, curve=self)
             return AffinePoint(x=x, y=m - y, curve=self)
 
@@ -865,9 +866,7 @@ class Curve(object):
         return self._buf_to_exponent(buf)
 
     def _buf_to_exponent(self, buf):
-        a = deserialize_number(buf, SER_BINARY)
-        a = (a % (self.order - 1)) + 1
-        return a
+        return (deserialize_number(buf, SER_BINARY) % (self.order - 1)) + 1
 
     def passphrase_to_pubkey(self, passphrase):
         return PubKey(self.base * self.passphrase_to_privkey(passphrase).e)
