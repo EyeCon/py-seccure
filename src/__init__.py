@@ -540,8 +540,7 @@ class AffinePoint(object):
         while True:
             k = gmpy2.mpz(
                 Crypto.Random.random.randrange(
-                    0, int(
-                        self.curve.order - 1)))
+                    0, int(self.curve.order - 1)))
             R = self.curve.base * k
             k = k * self.curve.cofactor
             Z = self * k
